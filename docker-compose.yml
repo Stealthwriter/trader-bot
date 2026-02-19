@@ -13,18 +13,33 @@ services:
     stdin_open: true
     tty: true
 
-  api:
+  chart-server:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: trader-api
+    container_name: trader-chart-server
     command: python -m uvicorn chart_server:app --host 0.0.0.0 --port 8000
     depends_on:
       - mt5linux
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./bot_config.json:/app/bot_config.json:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    container_name: trader-caddy
+    depends_on:
+      - chart-server
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy:/etc/caddy
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
 
   bot:
@@ -38,3 +53,7 @@ services:
     volumes:
       - ./bot_config.json:/app/bot_config.json:ro
     restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

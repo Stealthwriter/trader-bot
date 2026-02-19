@@ -1,0 +1,4 @@
+trader.aivntg.com {
+    encode zstd gzip
+    reverse_proxy chart-server:8000
+}

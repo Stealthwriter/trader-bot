@@ -19,6 +19,7 @@ from strategy import SamaLiveStrategy
 
 
 H1_SECONDS = 3600
+RETRY_DELAY_SECONDS = 10.0
 CONFIG_PATH = Path("bot_config.json")
 
 
@@ -91,45 +92,64 @@ def main() -> int:
     print_replay_events_limit = int(bot_cfg.get("print_replay_events_limit", 20))
     strategy_cfg = bot_cfg["strategy"]
 
-    mt5 = MetaTrader5(host=mt5_host, port=mt5_port)
-
-    if not mt5.initialize(timeout=mt5_timeout_ms):
-        error_code, error_message = _mt5_error_fields(mt5)
-        _log(
-            "ERROR",
-            "bot",
-            "startup.init",
-            error_code=error_code,
-            context="initialize",
-            message=error_message,
-        )
-        return 1
-
-    if not mt5.symbol_select(symbol, True):
-        error_code, error_message = _mt5_error_fields(mt5)
-        _log(
-            "ERROR",
-            "bot",
-            "startup.symbol_select",
-            error_code=error_code,
-            symbol=symbol,
-            message=error_message,
-        )
-        mt5.shutdown()
-        return 1
-
+    mt5: MetaTrader5 | None = None
+    initial_rates = None
     try:
-        initial_rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_H1, 1, lookback_candles)
-        if initial_rates is None or len(initial_rates) == 0:
-            error_code, error_message = _mt5_error_fields(mt5)
-            _log(
-                "ERROR",
-                "bot",
-                "startup.load_initial",
-                error_code=error_code,
-                symbol=symbol,
-                message=error_message,
-            )
+        while True:
+            mt5 = MetaTrader5(host=mt5_host, port=mt5_port)
+
+            if not mt5.initialize(timeout=mt5_timeout_ms):
+                error_code, error_message = _mt5_error_fields(mt5)
+                _log(
+                    "ERROR",
+                    "bot",
+                    "startup.init",
+                    error_code=error_code,
+                    context="initialize",
+                    message=error_message,
+                    retry_in_seconds=f"{RETRY_DELAY_SECONDS:g}",
+                )
+                mt5.shutdown()
+                mt5 = None
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+
+            if not mt5.symbol_select(symbol, True):
+                error_code, error_message = _mt5_error_fields(mt5)
+                _log(
+                    "ERROR",
+                    "bot",
+                    "startup.symbol_select",
+                    error_code=error_code,
+                    symbol=symbol,
+                    message=error_message,
+                    retry_in_seconds=f"{RETRY_DELAY_SECONDS:g}",
+                )
+                mt5.shutdown()
+                mt5 = None
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+
+            initial_rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_H1, 1, lookback_candles)
+            if initial_rates is None or len(initial_rates) == 0:
+                error_code, error_message = _mt5_error_fields(mt5)
+                _log(
+                    "ERROR",
+                    "bot",
+                    "startup.load_initial",
+                    error_code=error_code,
+                    symbol=symbol,
+                    message=error_message,
+                    retry_in_seconds=f"{RETRY_DELAY_SECONDS:g}",
+                )
+                mt5.shutdown()
+                mt5 = None
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+
+            break
+
+        if mt5 is None or initial_rates is None:
             return 1
 
         strategy = SamaLiveStrategy.from_config(mt5=mt5, symbol=symbol, config_data=strategy_cfg)
@@ -214,7 +234,8 @@ def main() -> int:
         _log("ERROR", "bot", "runtime.fatal", error_code="unhandled_exception", message=exc)
         return 1
     finally:
-        mt5.shutdown()
+        if mt5 is not None:
+            mt5.shutdown()
 
     return 0
 

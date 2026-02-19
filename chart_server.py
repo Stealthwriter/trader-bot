@@ -21,6 +21,7 @@ H1_SECONDS = 3600
 DEFAULT_LIMIT = 200
 MAX_LIMIT = 2000
 POLL_INTERVAL_SECONDS = 5.0
+RETRY_DELAY_SECONDS = 10.0
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -141,6 +142,7 @@ def _connect_and_preload() -> None:
 
     if not mt5.initialize(timeout=SERVER_CFG.mt5_timeout_ms):
         error_code, error_message = _mt5_error_fields(mt5)
+        mt5.shutdown()
         raise RuntimeError(f"MT5 initialize failed: {error_code} {error_message}")
 
     if not mt5.symbol_select(SERVER_CFG.symbol, True):
@@ -173,6 +175,21 @@ def _connect_and_preload() -> None:
         preload_bars=len(LIVE_CANDLES),
         last_closed_time=LAST_CLOSED_TIME,
     )
+
+
+def _connect_and_preload_with_retry() -> None:
+    while True:
+        try:
+            _connect_and_preload()
+            return
+        except Exception as exc:
+            _log(
+                "ERROR",
+                "startup.retry",
+                message=exc,
+                retry_in_seconds=f"{RETRY_DELAY_SECONDS:g}",
+            )
+            time.sleep(RETRY_DELAY_SECONDS)
 
 
 def _poll_loop() -> None:
@@ -294,8 +311,8 @@ app = FastAPI(title="TradingView Lightweight Charts Demo")
 @app.on_event("startup")
 def on_startup() -> None:
     global POLLER_THREAD
-    _connect_and_preload()
     STOP_EVENT.clear()
+    _connect_and_preload_with_retry()
     POLLER_THREAD = threading.Thread(target=_poll_loop, name="mt5-candle-poller", daemon=True)
     POLLER_THREAD.start()
 

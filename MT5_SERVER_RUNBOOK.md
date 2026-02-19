@@ -176,19 +176,22 @@ docker logs -f mt5linux
   - Open noVNC (`6081`) and complete MT5 first-run/login.
   - Check `mt5.last_error()` and `docker logs mt5linux`.
 
-## 10) Run full project stack (MT5 + API + bot)
+## 10) Run full project stack (MT5 + chart server + bot + Caddy)
 
 This repository now includes a root `docker-compose.yml` that runs:
 
 - `mt5linux` (`lprett/mt5linux:mt5-installed`)
-- `api` (`chart_server.py` via `uvicorn`)
+- `chart-server` (`chart_server.py` via `uvicorn`)
 - `bot` (`bot.py`)
+- `caddy` (HTTPS reverse proxy for `trader.aivntg.com`)
 
 Notes:
 
 - `bot_config.json` is set to `mt5.host = "mt5linux"` for internal Compose networking.
-- Port `18812` is internal-only (not published to host).
+- Port `18812` is currently published to host in this Compose file.
 - noVNC is exposed on `6081`.
+- `chart-server` is internal-only on port `8000` (reachable through Caddy).
+- For automatic HTTPS, `trader.aivntg.com` must point to this server and ports `80` + `443` must be open.
 
 Start:
 
@@ -207,8 +210,11 @@ First-time login (required):
 Validate services:
 
 ```bash
-# API logs
-docker compose logs -f api
+# Chart server logs
+docker compose logs -f chart-server
+
+# Caddy logs
+docker compose logs -f caddy
 
 # Bot logs
 docker compose logs -f bot
@@ -216,8 +222,8 @@ docker compose logs -f bot
 
 Then open:
 
-- `http://localhost:8000/`
-- `http://localhost:8000/api/candles?limit=100`
+- `https://trader.aivntg.com/`
+- `https://trader.aivntg.com/api/candles?limit=100`
 
 Stop:
 
