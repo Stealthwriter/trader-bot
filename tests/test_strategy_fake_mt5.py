@@ -53,6 +53,12 @@ class FakeSymbolInfo:
     volume_step: float
 
 
+@dataclass
+class FakeTerminalInfo:
+    trade_allowed: bool
+    tradeapi_disabled: bool
+
+
 class FakeMT5:
     ORDER_TYPE_BUY = 0
     ORDER_TYPE_SELL = 1
@@ -70,6 +76,8 @@ class FakeMT5:
         self._next_ticket = 1000
         self.sent_orders: list[dict] = []
         self._equity = 10_000.0
+        self._trade_allowed = True
+        self._tradeapi_disabled = False
 
     def last_error(self):
         return (1, "Success")
@@ -85,6 +93,12 @@ class FakeMT5:
             volume_min=0.01,
             volume_max=100.0,
             volume_step=0.01,
+        )
+
+    def terminal_info(self):
+        return FakeTerminalInfo(
+            trade_allowed=self._trade_allowed,
+            tradeapi_disabled=self._tradeapi_disabled,
         )
 
     def positions_get(self, symbol=None):
@@ -330,6 +344,26 @@ class TestSamaStrategyWithFakeMT5(unittest.TestCase):
 
         self.assertEqual(strategy.position_side, "flat")
         self.assertEqual(len(self.mt5.sent_orders), 0)
+
+    def test_autotrading_disabled_blocks_order_submission(self):
+        candles = make_initial_candles()
+        strategy = SamaLiveStrategy(self.mt5, self.symbol, self.base_cfg)
+
+        t1 = int(candles[-1]["time"]) + 3600
+        p1 = 3000.1
+        signal_map = {
+            p1: {"long_flip": True, "short_flip": False, "chop": False},
+        }
+
+        self.mt5._trade_allowed = False
+        with patched_build_signal_frame(signal_map):
+            strategy.initialize(candles)
+            candles.append(make_candle(t1, p1))
+            strategy.on_new_closed_bar(candles)
+
+        self.assertEqual(strategy.position_side, "flat")
+        self.assertEqual(len(self.mt5.sent_orders), 0)
+        self.assertEqual(len(strategy.trades), 0)
 
 
 if __name__ == "__main__":

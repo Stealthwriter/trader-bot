@@ -194,6 +194,9 @@ class SamaLiveStrategy:
         self._order_filling_ioc = int(getattr(self.mt5, "ORDER_FILLING_IOC", 1))
         self._retcode_done = int(getattr(self.mt5, "TRADE_RETCODE_DONE", 10009))
         self._retcode_placed = int(getattr(self.mt5, "TRADE_RETCODE_PLACED", 10008))
+        self._retcode_client_disable = int(
+            getattr(self.mt5, "TRADE_RETCODE_CLIENT_DISABLES_AT", 10027)
+        )
 
     @classmethod
     def from_config(cls, mt5: Any, symbol: str, config_data: dict[str, Any]) -> "SamaLiveStrategy":
@@ -733,6 +736,40 @@ class SamaLiveStrategy:
             )
         return ok
 
+    def _terminal_trade_enabled(self, reason: str) -> bool:
+        terminal_info_fn = getattr(self.mt5, "terminal_info", None)
+        if not callable(terminal_info_fn):
+            return True
+
+        terminal_info = terminal_info_fn()
+        if terminal_info is None:
+            error_code, error_message = self._mt5_error_fields()
+            self._log(
+                "WARN",
+                "order.guard",
+                error_code="terminal_info_failed",
+                mt5_error_code=error_code,
+                message=error_message,
+                reason=reason or "n/a",
+            )
+            return True
+
+        trade_allowed = bool(getattr(terminal_info, "trade_allowed", True))
+        tradeapi_disabled = bool(getattr(terminal_info, "tradeapi_disabled", False))
+        if trade_allowed and not tradeapi_disabled:
+            return True
+
+        self._log(
+            "ERROR",
+            "order.guard",
+            error_code="autotrading_disabled",
+            trade_allowed=int(trade_allowed),
+            tradeapi_disabled=int(tradeapi_disabled),
+            reason=reason or "n/a",
+            hint="Enable MT5 AutoTrading in toolbar and Expert Advisors options",
+        )
+        return False
+
     def _send_market_order(
         self,
         side: PositionSide,
@@ -741,6 +778,9 @@ class SamaLiveStrategy:
         sl_price: float | None = None,
         reason: str = "",
     ) -> bool:
+        if not self._terminal_trade_enabled(reason=reason):
+            return False
+
         tick = self.mt5.symbol_info_tick(self.symbol)
         if tick is None:
             error_code, error_message = self._mt5_error_fields()
@@ -809,6 +849,20 @@ class SamaLiveStrategy:
             return False
 
         retcode = int(getattr(result, "retcode", -1))
+        if retcode == self._retcode_client_disable:
+            self._log(
+                "ERROR",
+                "order.result",
+                status="rejected",
+                error_code="autotrading_disabled",
+                retcode=retcode,
+                ticket=getattr(result, "order", "n/a"),
+                comment=getattr(result, "comment", ""),
+                reason=reason or "n/a",
+                hint="Enable MT5 AutoTrading in toolbar and Expert Advisors options",
+            )
+            return False
+
         if retcode not in (self._retcode_done, self._retcode_placed):
             self._log(
                 "WARN",

@@ -273,7 +273,7 @@ def _sama_line_and_markers(
             threshold = float(SERVER_CFG.indicator.flat_threshold)
             if slope_value > threshold:
                 color = "#22c55e"
-            elif slope_value < -threshold:
+            elif slope_value <= -threshold:
                 color = "#ef4444"
             else:
                 color = "#facc15"
