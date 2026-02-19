@@ -4,10 +4,12 @@ services:
     container_name: mt5linux
     environment:
       MT5_HOST: 0.0.0.0
+      MT5_PORT: 18812
       VNC_PASSWORD: password
     ports:
       - "6081:6081"
-    restart: unless-stopped
+      - "18812:18812"
+    restart: "no"
     stdin_open: true
     tty: true
 
