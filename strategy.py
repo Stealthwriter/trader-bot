@@ -138,15 +138,15 @@ def build_signal_frame(
 @dataclass
 class StrategyConfig:
     position_size: float = 0.0025
-    ama_length: int = 180
-    major_length: int = 24
-    minor_length: int = 7
-    slope_period: int = 110
-    slope_in_range: float = 20.0
-    flat_threshold: float = 20.0
+    ama_length: int = 191
+    major_length: int = 28
+    minor_length: int = 6
+    slope_period: int = 109
+    slope_in_range: float = 30.0
+    flat_threshold: float = 30.0
     warmup_bars: int = 400
     chop_debounce: bool = True
-    chop_debounce_bars: int = 2
+    chop_debounce_bars: int = 3
     use_hard_stop_loss: bool = False
     hard_stop_loss_pct: float = 0.04
     order_deviation: int = 20

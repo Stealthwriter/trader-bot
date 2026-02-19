@@ -698,12 +698,12 @@ Indicator API:
 ```json
 {
   "config": {
-    "ama_length": 180,
-    "major_length": 24,
-    "minor_length": 7,
-    "slope_period": 110,
-    "slope_in_range": 20.0,
-    "flat_threshold": 20.0
+    "ama_length": 191,
+    "major_length": 28,
+    "minor_length": 6,
+    "slope_period": 109,
+    "slope_in_range": 30.0,
+    "flat_threshold": 30.0
   },
   "sama_line": [
     {"time": 1739912400, "value": 101.3, "color": "#22c55e"},
