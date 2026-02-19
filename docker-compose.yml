@@ -1,0 +1,38 @@
+services:
+  mt5linux:
+    image: lprett/mt5linux:mt5-installed
+    container_name: mt5linux
+    environment:
+      MT5_HOST: 0.0.0.0
+      VNC_PASSWORD: password
+    ports:
+      - "6081:6081"
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trader-api
+    command: python -m uvicorn chart_server:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - mt5linux
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./bot_config.json:/app/bot_config.json:ro
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trader-bot
+    command: python bot.py
+    depends_on:
+      - mt5linux
+    volumes:
+      - ./bot_config.json:/app/bot_config.json:ro
+    restart: unless-stopped

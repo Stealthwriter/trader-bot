@@ -1,0 +1,28 @@
+{
+  "mt5": {
+    "host": "mt5linux",
+    "port": 18812,
+    "timeout_ms": 120000
+  },
+  "symbol": "ETHUSDr",
+  "poll_seconds": 1.0,
+  "lookback_candles": 1000,
+  "print_replay_events": false,
+  "print_replay_events_limit": 20,
+  "strategy": {
+    "position_size": 0.0025,
+    "ama_length": 192,
+    "major_length": 15,
+    "minor_length": 7,
+    "slope_period": 111,
+    "slope_in_range": 20,
+    "flat_threshold": 20,
+    "warmup_bars": 400,
+    "chop_debounce": true,
+    "chop_debounce_bars": 2,
+    "use_hard_stop_loss": false,
+    "hard_stop_loss_pct": 0.04,
+    "order_deviation": 20,
+    "magic": 1802407
+  }
+}
