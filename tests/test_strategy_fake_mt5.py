@@ -43,6 +43,7 @@ class FakeOrderResult:
 @dataclass
 class FakeAccountInfo:
     equity: float
+    leverage: float
 
 
 @dataclass
@@ -76,6 +77,7 @@ class FakeMT5:
         self._next_ticket = 1000
         self.sent_orders: list[dict] = []
         self._equity = 10_000.0
+        self._leverage = 1.0
         self._trade_allowed = True
         self._tradeapi_disabled = False
 
@@ -83,7 +85,7 @@ class FakeMT5:
         return (1, "Success")
 
     def account_info(self):
-        return FakeAccountInfo(equity=self._equity)
+        return FakeAccountInfo(equity=self._equity, leverage=self._leverage)
 
     def symbol_info(self, symbol):
         if symbol != self.symbol:
@@ -364,6 +366,23 @@ class TestSamaStrategyWithFakeMT5(unittest.TestCase):
         self.assertEqual(strategy.position_side, "flat")
         self.assertEqual(len(self.mt5.sent_orders), 0)
         self.assertEqual(len(strategy.trades), 0)
+
+    def test_entry_volume_uses_margin_fraction_and_leverage(self):
+        cfg = StrategyConfig(
+            position_size=0.0025,
+            warmup_bars=0,
+            chop_debounce=True,
+            chop_debounce_bars=1,
+            use_hard_stop_loss=False,
+        )
+        strategy = SamaLiveStrategy(self.mt5, self.symbol, cfg)
+        self.mt5._equity = 100_954.0
+        self.mt5._leverage = 400.0
+
+        volume = strategy._entry_volume_from_equity(signal_close=1862.0)
+
+        self.assertIsNotNone(volume)
+        self.assertAlmostEqual(float(volume), 54.21, places=2)
 
 
 if __name__ == "__main__":

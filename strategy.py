@@ -616,6 +616,11 @@ class SamaLiveStrategy:
             self._log("ERROR", "order.size", error_code="invalid_equity", equity=equity)
             return None
 
+        leverage = float(getattr(account_info, "leverage", 1.0))
+        if not np.isfinite(leverage) or leverage <= 0.0:
+            self._log("ERROR", "order.size", error_code="invalid_leverage", leverage=leverage)
+            return None
+
         close_price = float(signal_close)
         if not np.isfinite(close_price) or close_price <= 0.0:
             self._log("ERROR", "order.size", error_code="invalid_signal_close", signal_close=signal_close)
@@ -625,7 +630,8 @@ class SamaLiveStrategy:
         if not np.isfinite(contract_size) or contract_size <= 0.0:
             contract_size = 1.0
 
-        target_notional = equity * float(self.cfg.position_size)
+        target_margin = equity * float(self.cfg.position_size)
+        target_notional = target_margin * leverage
         raw_volume = target_notional / (close_price * contract_size)
 
         volume_min = float(getattr(symbol_info, "volume_min", 0.0) or 0.0)
@@ -657,7 +663,9 @@ class SamaLiveStrategy:
                 "order.size",
                 error_code="computed_volume_invalid",
                 equity=equity,
+                leverage=leverage,
                 position_size=float(self.cfg.position_size),
+                target_margin=target_margin,
                 signal_close=close_price,
                 contract_size=contract_size,
                 raw_volume=raw_volume,
@@ -669,7 +677,9 @@ class SamaLiveStrategy:
             "INFO",
             "order.size",
             equity=equity,
+            leverage=leverage,
             position_size=float(self.cfg.position_size),
+            target_margin=target_margin,
             target_notional=target_notional,
             signal_close=close_price,
             contract_size=contract_size,
